@@ -1,0 +1,180 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: api-guardian-postgres
+    environment:
+      POSTGRES_DB: api_guardian
+      POSTGRES_USER: guardian
+      POSTGRES_PASSWORD: guardian_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - guardian-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guardian"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: api-guardian-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - guardian-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ../backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: api-guardian-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_CLOUD_GATEWAY_ROUTES_0_ID: core-engine
+      SPRING_CLOUD_GATEWAY_ROUTES_0_URI: http://core-engine:8081
+    depends_on:
+      - redis
+    networks:
+      - guardian-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Core Engine
+  core-engine:
+    build:
+      context: ../backend/core-engine
+      dockerfile: Dockerfile
+    container_name: api-guardian-core
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/api_guardian
+      SPRING_DATASOURCE_USERNAME: guardian
+      SPRING_DATASOURCE_PASSWORD: guardian_pass
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      LLM_SERVICE_URL: http://llm-service:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - guardian-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # LLM Service
+  llm-service:
+    build:
+      context: ../backend/llm-service
+      dockerfile: Dockerfile
+    container_name: api-guardian-llm
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_PRIMARY_PROVIDER: ${LLM_PRIMARY_PROVIDER:-openai}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+    depends_on:
+      - redis
+    networks:
+      - guardian-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Scanner Service
+  scanner-service:
+    build:
+      context: ../backend/scanner-service
+      dockerfile: Dockerfile
+    container_name: api-guardian-scanner
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+    networks:
+      - guardian-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Report Service
+  report-service:
+    build:
+      context: ../backend/report-service
+      dockerfile: Dockerfile
+    container_name: api-guardian-report
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/api_guardian
+      SPRING_DATASOURCE_USERNAME: guardian
+      SPRING_DATASOURCE_PASSWORD: guardian_pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - guardian-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: api-guardian-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+    depends_on:
+      - api-gateway
+    networks:
+      - guardian-network
+
+networks:
+  guardian-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+
