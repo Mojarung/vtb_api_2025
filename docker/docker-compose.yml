@@ -98,9 +98,8 @@ services:
       - "8082:8082"
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      LLM_PRIMARY_PROVIDER: ${LLM_PRIMARY_PROVIDER:-openai}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-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}
+      LLM_PRIMARY_PROVIDER: ${LLM_PRIMARY_PROVIDER:-nvidia}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
     depends_on:

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.25.xsd">
+
+    <changeSet id="003-create-vulnerabilities-table" author="vtb-team">
+        <createTable tableName="vulnerabilities">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="scan_id" type="uuid">
+                <constraints foreignKeyName="fk_vulnerabilities_scan" references="scans(id)" 
+                             deleteCascade="true" nullable="false"/>
+            </column>
+            <column name="type" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="severity" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="varchar(500)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="text"/>
+            <column name="endpoint" type="varchar(500)"/>
+            <column name="method" type="varchar(10)"/>
+            <column name="recommendation" type="text"/>
+            <column name="code_example" type="text"/>
+            <column name="exploit_poc" type="text"/>
+            <column name="owasp_category" type="varchar(50)"/>
+            <column name="affected_parameter" type="text"/>
+            <column name="cvss_score" type="decimal(3,1)"/>
+            <column name="ai_generated" type="boolean" defaultValueBoolean="false"/>
+            <column name="ai_confidence" type="decimal(3,2)"/>
+            <column name="detected_at" type="timestamp" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createTable tableName="vulnerability_references">
+            <column name="vulnerability_id" type="uuid">
+                <constraints foreignKeyName="fk_references_vulnerability" references="vulnerabilities(id)" 
+                             deleteCascade="true" nullable="false"/>
+            </column>
+            <column name="reference_url" type="text">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>
+
